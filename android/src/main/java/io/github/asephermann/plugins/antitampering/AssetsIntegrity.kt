@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.res.AssetManager
+import android.os.Build
 import android.util.Base64
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -29,13 +30,19 @@ internal object AssetsIntegrity {
             var msg = ""
             val appInfo: PackageInfo =
                 pm.getPackageInfo(activity.packageName, PackageManager.GET_SIGNATURES)
-            val sign: String = appInfo.signatures[0].toCharsString()
+            val sign = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val signatures = appInfo.signingInfo?.apkContentsSigners
+                signatures?.getOrNull(0)?.toCharsString() ?: ""
+            } else {
+                @Suppress("DEPRECATION")
+                appInfo.signatures?.getOrNull(0)?.toCharsString() ?: ""
+            }
+
             if (sign == "") msg += "App not signed\n"
-//            Log.d("AssetsIntegrity", sign)
+
             for ((key, value) in assetsHashes.entries) {
                 val fileNameDecode: ByteArray = Base64.decode(key, 0)
                 val fileName = String(fileNameDecode, StandardCharsets.UTF_8)
-//            Log.d("AntiTampering", "$fileName -> $value")
                 val filePath = ASSETS_BASE_PATH + fileName
                 val file = assets.open(filePath)
                 val hash = getFileHash(file)
@@ -80,7 +87,6 @@ internal object AssetsIntegrity {
             }
             hexString.append(Integer.toHexString(0xFF and hashBytes[i].toInt()))
         }
-//        Log.d("AntiTampering", String(hexString))
         return String(hexString)
     }
 }
